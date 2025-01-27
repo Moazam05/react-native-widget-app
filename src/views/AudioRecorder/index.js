@@ -6,101 +6,143 @@ import {
   Platform,
   PermissionsAndroid,
   Text,
+  Alert,
+  Linking,
 } from 'react-native';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import RNFS from 'react-native-fs';
 
 const AudioRecorderScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedFile, setRecordedFile] = useState(null);
+  const [recordTime, setRecordTime] = useState('00:00');
   const audioRecorderPlayer = new AudioRecorderPlayer();
 
+  console.log('Salman Muazam');
+
+  const checkAndRequestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        // First check if we already have permission
+        const currentPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        );
+        console.log(
+          'Current RECORD_AUDIO permission status:',
+          currentPermission,
+        );
+
+        // Only request if we don't have permission
+        if (!currentPermission) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+            {
+              title: 'Microphone Permission',
+              message: 'App needs access to your microphone to record audio',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            },
+          );
+
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert(
+              'Permission Required',
+              'Please grant microphone permission to record audio',
+              [
+                {text: 'Cancel', style: 'cancel'},
+                {
+                  text: 'Open Settings',
+                  onPress: () => Linking.openSettings(),
+                },
+              ],
+            );
+            return false;
+          }
+        }
+        return true;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const startRecording = async () => {
+    const hasPermission = await checkAndRequestPermissions();
+    if (!hasPermission) {
+      return;
+    }
+
+    try {
+      const path = Platform.select({
+        ios: 'recording.m4a',
+        android: `${RNFS.CachesDirectoryPath}/recording.mp3`,
+      });
+
+      await audioRecorderPlayer.startRecorder(path);
+
+      audioRecorderPlayer.addRecordBackListener(e => {
+        const seconds = Math.floor(e.currentPosition / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        const timeString = `${minutes
+          .toString()
+          .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        setRecordTime(timeString);
+      });
+
+      setIsRecording(true);
+      setRecordedFile(path);
+    } catch (error) {
+      console.error('Recording error:', error);
+      Alert.alert('Error', 'Failed to start recording. Please try again.');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!isRecording) return;
+
+    try {
+      await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
+      setIsRecording(false);
+      setRecordTime('00:00');
+    } catch (error) {
+      console.error('Stop recording error:', error);
+    }
+  };
+
+  const playRecording = async () => {
+    if (!recordedFile) return;
+
+    try {
+      await audioRecorderPlayer.startPlayer(recordedFile);
+      audioRecorderPlayer.addPlayBackListener(e => {
+        if (e.currentPosition === e.duration) {
+          audioRecorderPlayer.stopPlayer();
+        }
+      });
+    } catch (error) {
+      console.error('Playback error:', error);
+      Alert.alert('Error', 'Failed to play recording');
+    }
+  };
+
+  // Cleanup on unmount
   useEffect(() => {
-    // Request permissions on component mount
-    requestPermissions();
     return () => {
-      // Cleanup on component unmount
       if (isRecording) {
         stopRecording();
       }
     };
   }, []);
 
-  const requestPermissions = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const grants = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        ]);
-
-        console.log('write external storage', grants);
-
-        if (
-          grants['android.permission.WRITE_EXTERNAL_STORAGE'] ===
-            PermissionsAndroid.RESULTS.GRANTED &&
-          grants['android.permission.READ_EXTERNAL_STORAGE'] ===
-            PermissionsAndroid.RESULTS.GRANTED &&
-          grants['android.permission.RECORD_AUDIO'] ===
-            PermissionsAndroid.RESULTS.GRANTED
-        ) {
-          console.log('Permissions granted');
-        } else {
-          console.log('All required permissions not granted');
-          return;
-        }
-      } catch (err) {
-        console.warn(err);
-        return;
-      }
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const result = await audioRecorderPlayer.startRecorder();
-      audioRecorderPlayer.addRecordBackListener(e => {
-        // You can use this to show recording duration
-        console.log('Recording time: ', e.currentPosition);
-        return;
-      });
-      setIsRecording(true);
-      console.log('Recording started', result);
-    } catch (error) {
-      console.error('Error starting recording:', error);
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      const result = await audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.removeRecordBackListener();
-      setIsRecording(false);
-      setRecordedFile(result);
-      console.log('Recording stopped', result);
-    } catch (error) {
-      console.error('Error stopping recording:', error);
-    }
-  };
-
-  const playRecording = async () => {
-    try {
-      if (recordedFile) {
-        console.log('Playing recorded file:', recordedFile);
-        await audioRecorderPlayer.startPlayer(recordedFile);
-        audioRecorderPlayer.addPlayBackListener(e => {
-          // You can use this to show playback progress
-          console.log('Playing time: ', e.currentPosition);
-          return;
-        });
-      }
-    } catch (error) {
-      console.error('Error playing recording:', error);
-    }
-  };
-
   return (
     <View style={styles.container}>
+      <Text style={styles.timerText}>{recordTime}</Text>
+
       <View style={styles.buttonContainer}>
         <Button
           title={isRecording ? 'Stop Recording' : 'Start Recording'}
@@ -108,11 +150,8 @@ const AudioRecorderScreen = () => {
         />
       </View>
 
-      {recordedFile && (
+      {recordedFile && !isRecording && (
         <View style={styles.buttonContainer}>
-          <Text style={styles.fileText}>
-            Recording saved at: {recordedFile}
-          </Text>
           <Button title="Play Recording" onPress={playRecording} />
         </View>
       )}
@@ -129,12 +168,12 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginVertical: 10,
-    width: '100%',
+    width: '80%',
   },
-  fileText: {
-    marginVertical: 10,
-    fontSize: 12,
-    color: '#666',
+  timerText: {
+    fontSize: 48,
+    marginBottom: 30,
+    color: '#333',
   },
 });
 
