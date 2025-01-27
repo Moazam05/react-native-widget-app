@@ -1,19 +1,18 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
-  Button,
   StyleSheet,
   Platform,
   PermissionsAndroid,
-  Text,
   Alert,
   Linking,
-  FlatList,
-  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
+import RecorderComponent from './components/RecorderComponent';
+import PlaybackComponent from './components/PlaybackComponent';
+import RecordingListComponent from './components/RecordingListComponent';
 
 const RECORDINGS_KEY = '@recordings';
 const RECORDINGS_DIRECTORY = Platform.select({
@@ -26,6 +25,12 @@ const AudioRecorderScreen = () => {
   const [recordTime, setRecordTime] = useState('00:00');
   const [recordings, setRecordings] = useState([]);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
+  const [playbackProgress, setPlaybackProgress] = useState({
+    currentTime: 0,
+    duration: 0,
+    playTime: '00:00',
+    durationTime: '00:00',
+  });
 
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
 
@@ -249,74 +254,6 @@ const AudioRecorderScreen = () => {
     }
   };
 
-  const playRecording = async recordingPath => {
-    try {
-      // Verify file exists before playing
-      const exists = await RNFS.exists(recordingPath);
-      if (!exists) {
-        throw new Error('Recording file not found');
-      }
-
-      if (currentlyPlaying === recordingPath) {
-        await audioRecorderPlayerRef.current.stopPlayer();
-        audioRecorderPlayerRef.current.removePlayBackListener();
-        setCurrentlyPlaying(null);
-        return;
-      }
-
-      if (currentlyPlaying) {
-        await audioRecorderPlayerRef.current.stopPlayer();
-        audioRecorderPlayerRef.current.removePlayBackListener();
-      }
-
-      await audioRecorderPlayerRef.current.startPlayer(recordingPath);
-      setCurrentlyPlaying(recordingPath);
-
-      audioRecorderPlayerRef.current.addPlayBackListener(e => {
-        if (e.currentPosition === e.duration) {
-          audioRecorderPlayerRef.current.stopPlayer();
-          audioRecorderPlayerRef.current.removePlayBackListener();
-          setCurrentlyPlaying(null);
-        }
-      });
-    } catch (error) {
-      console.error('Playback error:', error);
-      Alert.alert('Error', 'Failed to play recording');
-      setCurrentlyPlaying(null);
-
-      // If file not found, refresh the recordings list
-      if (error.message === 'Recording file not found') {
-        loadRecordings();
-      }
-    }
-  };
-
-  const renderRecording = ({item}) => {
-    const isPlaying = currentlyPlaying === item.path;
-    const date = new Date(item.timestamp).toLocaleString();
-
-    return (
-      <View style={styles.recordingItem}>
-        <View style={styles.recordingInfo}>
-          <Text style={styles.recordingName}>{item.name}</Text>
-          <Text style={styles.recordingDate}>{date}</Text>
-        </View>
-        <View style={styles.recordingControls}>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => playRecording(item.path)}>
-            <Text>{isPlaying ? 'Stop' : 'Play'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.controlButton, styles.deleteButton]}
-            onPress={() => deleteRecording(item.id)}>
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -330,29 +267,84 @@ const AudioRecorderScreen = () => {
     };
   }, [isRecording, currentlyPlaying]);
 
+  const handlePlayRecording = async recording => {
+    try {
+      if (currentlyPlaying?.path === recording.path) {
+        await stopPlayback();
+        return;
+      }
+
+      const exists = await RNFS.exists(recording.path);
+      if (!exists) {
+        throw new Error('Recording file not found');
+      }
+
+      if (currentlyPlaying) {
+        await stopPlayback();
+      }
+
+      await audioRecorderPlayerRef.current.startPlayer(recording.path);
+      setCurrentlyPlaying(recording);
+
+      audioRecorderPlayerRef.current.addPlayBackListener(e => {
+        setPlaybackProgress({
+          currentTime: e.currentPosition,
+          duration: e.duration,
+          playTime: audioRecorderPlayerRef.current.mmssss(
+            Math.floor(e.currentPosition),
+          ),
+          durationTime: audioRecorderPlayerRef.current.mmssss(
+            Math.floor(e.duration),
+          ),
+        });
+
+        if (e.currentPosition === e.duration) {
+          stopPlayback();
+        }
+      });
+    } catch (error) {
+      console.error('Playback error:', error);
+      Alert.alert('Error', 'Failed to play recording');
+      await stopPlayback();
+    }
+  };
+
+  const stopPlayback = async () => {
+    try {
+      await audioRecorderPlayerRef.current.stopPlayer();
+      audioRecorderPlayerRef.current.removePlayBackListener();
+      setCurrentlyPlaying(null);
+      setPlaybackProgress({
+        currentTime: 0,
+        duration: 0,
+        playTime: '00:00',
+        durationTime: '00:00',
+      });
+    } catch (error) {
+      console.error('Error stopping playback:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.recordingSection}>
-        <Text style={styles.timerText}>{recordTime}</Text>
-        <View style={styles.buttonContainer}>
-          <Button
-            title={isRecording ? 'Stop Recording' : 'Start Recording'}
-            onPress={isRecording ? stopRecording : startRecording}
-          />
-        </View>
-      </View>
+      <RecorderComponent
+        isRecording={isRecording}
+        recordTime={recordTime}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+      />
 
-      <View style={styles.recordingsList}>
-        <Text style={styles.sectionTitle}>Recordings</Text>
-        <FlatList
-          data={recordings}
-          renderItem={renderRecording}
-          keyExtractor={item => item.id}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No recordings yet</Text>
-          }
-        />
-      </View>
+      <PlaybackComponent
+        currentRecording={currentlyPlaying}
+        progress={playbackProgress}
+        onStop={stopPlayback}
+      />
+
+      <RecordingListComponent
+        recordings={recordings}
+        onPlayRecording={handlePlayRecording}
+        onDeleteRecording={deleteRecording}
+      />
     </View>
   );
 };
@@ -362,27 +354,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  recordingSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  buttonContainer: {
-    marginVertical: 10,
-    width: '80%',
-  },
-  timerText: {
-    fontSize: 48,
-    marginBottom: 30,
-    color: '#333',
-  },
-  recordingsList: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
+
   recordingItem: {
     flexDirection: 'row',
     padding: 15,
@@ -417,11 +389,6 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: 'white',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 20,
   },
 });
 
