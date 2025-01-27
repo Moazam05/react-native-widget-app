@@ -196,7 +196,9 @@ const AudioRecorderScreen = () => {
   const startRecording = async () => {
     try {
       const hasPermission = await checkAndRequestPermissions();
-      if (!hasPermission) return;
+      if (!hasPermission) {
+        return;
+      }
 
       const timestamp = new Date().getTime();
       const tempPath = Platform.select({
@@ -232,7 +234,9 @@ const AudioRecorderScreen = () => {
   };
 
   const stopRecording = async () => {
-    if (!isRecording) return;
+    if (!isRecording) {
+      return;
+    }
 
     try {
       // Get the file path before stopping the recorder
@@ -353,42 +357,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-  },
-
-  recordingItem: {
-    flexDirection: 'row',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  recordingInfo: {
-    flex: 1,
-  },
-  recordingName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  recordingDate: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  recordingControls: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  controlButton: {
-    padding: 8,
-    borderRadius: 4,
-    backgroundColor: '#e0e0e0',
-  },
-  deleteButton: {
-    backgroundColor: '#ff4444',
-  },
-  deleteButtonText: {
-    color: 'white',
   },
 });
 
