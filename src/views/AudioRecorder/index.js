@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Button,
@@ -8,31 +8,120 @@ import {
   Text,
   Alert,
   Linking,
+  FlatList,
+  TouchableOpacity,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 
+const RECORDINGS_KEY = '@recordings';
+const RECORDINGS_DIRECTORY = Platform.select({
+  ios: `${RNFS.DocumentDirectoryPath}/recordings`,
+  android: `${RNFS.ExternalDirectoryPath}/recordings`,
+});
+
 const AudioRecorderScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedFile, setRecordedFile] = useState(null);
   const [recordTime, setRecordTime] = useState('00:00');
-  const audioRecorderPlayer = new AudioRecorderPlayer();
+  const [recordings, setRecordings] = useState([]);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
 
-  console.log('Salman Muazam');
+  const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
+
+  // Load saved recordings on mount
+  useEffect(() => {
+    loadRecordings();
+  }, []);
+
+  const loadRecordings = async () => {
+    try {
+      const savedRecordings = await AsyncStorage.getItem(RECORDINGS_KEY);
+      if (savedRecordings) {
+        const parsedRecordings = JSON.parse(savedRecordings);
+
+        // Verify each recording file exists
+        const verifiedRecordings = [];
+        for (const recording of parsedRecordings) {
+          const exists = await RNFS.exists(recording.path);
+          if (exists) {
+            verifiedRecordings.push(recording);
+          }
+        }
+
+        // Update storage with only existing recordings
+        if (verifiedRecordings.length !== parsedRecordings.length) {
+          await AsyncStorage.setItem(
+            RECORDINGS_KEY,
+            JSON.stringify(verifiedRecordings),
+          );
+        }
+
+        setRecordings(verifiedRecordings);
+      }
+    } catch (error) {
+      console.error('Error loading recordings:', error);
+    }
+  };
+
+  const saveRecording = async filePath => {
+    try {
+      const timestamp = new Date().getTime();
+      const fileName = `recording_${timestamp}${
+        Platform.OS === 'ios' ? '.m4a' : '.mp3'
+      }`;
+      const newPath = `${RECORDINGS_DIRECTORY}/${fileName}`;
+
+      // Move the recording to our permanent directory
+      await RNFS.moveFile(filePath, newPath);
+
+      const newRecording = {
+        id: timestamp.toString(),
+        path: newPath,
+        name: `Recording ${recordings.length + 1}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      const updatedRecordings = [...recordings, newRecording];
+      await AsyncStorage.setItem(
+        RECORDINGS_KEY,
+        JSON.stringify(updatedRecordings),
+      );
+      setRecordings(updatedRecordings);
+    } catch (error) {
+      console.error('Error saving recording:', error);
+      Alert.alert('Error', 'Failed to save recording');
+    }
+  };
+
+  const deleteRecording = async id => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (recording) {
+        // Delete the file
+        await RNFS.unlink(recording.path);
+
+        // Update AsyncStorage and state
+        const updatedRecordings = recordings.filter(r => r.id !== id);
+        await AsyncStorage.setItem(
+          RECORDINGS_KEY,
+          JSON.stringify(updatedRecordings),
+        );
+        setRecordings(updatedRecordings);
+      }
+    } catch (error) {
+      console.error('Error deleting recording:', error);
+      Alert.alert('Error', 'Failed to delete recording');
+    }
+  };
 
   const checkAndRequestPermissions = async () => {
     if (Platform.OS === 'android') {
       try {
-        // First check if we already have permission
         const currentPermission = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         );
-        console.log(
-          'Current RECORD_AUDIO permission status:',
-          currentPermission,
-        );
 
-        // Only request if we don't have permission
         if (!currentPermission) {
           const granted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
@@ -70,20 +159,29 @@ const AudioRecorderScreen = () => {
   };
 
   const startRecording = async () => {
-    const hasPermission = await checkAndRequestPermissions();
-    if (!hasPermission) {
-      return;
-    }
-
     try {
-      const path = Platform.select({
-        ios: 'recording.m4a',
-        android: `${RNFS.CachesDirectoryPath}/recording.mp3`,
+      const hasPermission = await checkAndRequestPermissions();
+      if (!hasPermission) {
+        return;
+      }
+
+      const timestamp = new Date().getTime();
+      const tempPath = Platform.select({
+        ios: `${RNFS.CachesDirectoryPath}/temp_${timestamp}.m4a`,
+        android: `${RNFS.CachesDirectoryPath}/temp_${timestamp}.mp3`,
       });
 
-      await audioRecorderPlayer.startRecorder(path);
+      if (isRecording) {
+        await audioRecorderPlayerRef.current.stopRecorder();
+        audioRecorderPlayerRef.current.removeRecordBackListener();
+      }
 
-      audioRecorderPlayer.addRecordBackListener(e => {
+      const result = await audioRecorderPlayerRef.current.startRecorder(
+        tempPath,
+      );
+      console.log('Recording started:', result);
+
+      audioRecorderPlayerRef.current.addRecordBackListener(e => {
         const seconds = Math.floor(e.currentPosition / 1000);
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
@@ -94,40 +192,97 @@ const AudioRecorderScreen = () => {
       });
 
       setIsRecording(true);
-      setRecordedFile(path);
     } catch (error) {
       console.error('Recording error:', error);
-      Alert.alert('Error', 'Failed to start recording. Please try again.');
+      Alert.alert('Error', 'Failed to start recording');
     }
   };
 
   const stopRecording = async () => {
-    if (!isRecording) return;
+    if (!isRecording) {
+      return;
+    }
 
     try {
-      await audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.removeRecordBackListener();
+      const result = await audioRecorderPlayerRef.current.stopRecorder();
+      audioRecorderPlayerRef.current.removeRecordBackListener();
       setIsRecording(false);
       setRecordTime('00:00');
+      console.log('Recording stopped:', result);
+
+      // Save the recording to permanent storage
+      await saveRecording(result);
     } catch (error) {
       console.error('Stop recording error:', error);
     }
   };
 
-  const playRecording = async () => {
-    if (!recordedFile) return;
-
+  const playRecording = async recordingPath => {
     try {
-      await audioRecorderPlayer.startPlayer(recordedFile);
-      audioRecorderPlayer.addPlayBackListener(e => {
+      // Verify file exists before playing
+      const exists = await RNFS.exists(recordingPath);
+      if (!exists) {
+        throw new Error('Recording file not found');
+      }
+
+      if (currentlyPlaying === recordingPath) {
+        await audioRecorderPlayerRef.current.stopPlayer();
+        audioRecorderPlayerRef.current.removePlayBackListener();
+        setCurrentlyPlaying(null);
+        return;
+      }
+
+      if (currentlyPlaying) {
+        await audioRecorderPlayerRef.current.stopPlayer();
+        audioRecorderPlayerRef.current.removePlayBackListener();
+      }
+
+      await audioRecorderPlayerRef.current.startPlayer(recordingPath);
+      setCurrentlyPlaying(recordingPath);
+
+      audioRecorderPlayerRef.current.addPlayBackListener(e => {
         if (e.currentPosition === e.duration) {
-          audioRecorderPlayer.stopPlayer();
+          audioRecorderPlayerRef.current.stopPlayer();
+          audioRecorderPlayerRef.current.removePlayBackListener();
+          setCurrentlyPlaying(null);
         }
       });
     } catch (error) {
       console.error('Playback error:', error);
       Alert.alert('Error', 'Failed to play recording');
+      setCurrentlyPlaying(null);
+
+      // If file not found, refresh the recordings list
+      if (error.message === 'Recording file not found') {
+        loadRecordings();
+      }
     }
+  };
+
+  const renderRecording = ({item}) => {
+    const isPlaying = currentlyPlaying === item.path;
+    const date = new Date(item.timestamp).toLocaleString();
+
+    return (
+      <View style={styles.recordingItem}>
+        <View style={styles.recordingInfo}>
+          <Text style={styles.recordingName}>{item.name}</Text>
+          <Text style={styles.recordingDate}>{date}</Text>
+        </View>
+        <View style={styles.recordingControls}>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => playRecording(item.path)}>
+            <Text>{isPlaying ? 'Stop' : 'Play'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.controlButton, styles.deleteButton]}
+            onPress={() => deleteRecording(item.id)}>
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   // Cleanup on unmount
@@ -136,25 +291,36 @@ const AudioRecorderScreen = () => {
       if (isRecording) {
         stopRecording();
       }
+      if (currentlyPlaying) {
+        audioRecorderPlayerRef.current.stopPlayer();
+      }
+      audioRecorderPlayerRef.current.removePlayBackListener();
     };
-  }, []);
+  }, [isRecording, currentlyPlaying]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.timerText}>{recordTime}</Text>
-
-      <View style={styles.buttonContainer}>
-        <Button
-          title={isRecording ? 'Stop Recording' : 'Start Recording'}
-          onPress={isRecording ? stopRecording : startRecording}
-        />
+      <View style={styles.recordingSection}>
+        <Text style={styles.timerText}>{recordTime}</Text>
+        <View style={styles.buttonContainer}>
+          <Button
+            title={isRecording ? 'Stop Recording' : 'Start Recording'}
+            onPress={isRecording ? stopRecording : startRecording}
+          />
+        </View>
       </View>
 
-      {recordedFile && !isRecording && (
-        <View style={styles.buttonContainer}>
-          <Button title="Play Recording" onPress={playRecording} />
-        </View>
-      )}
+      <View style={styles.recordingsList}>
+        <Text style={styles.sectionTitle}>Recordings</Text>
+        <FlatList
+          data={recordings}
+          renderItem={renderRecording}
+          keyExtractor={item => item.id}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No recordings yet</Text>
+          }
+        />
+      </View>
     </View>
   );
 };
@@ -162,9 +328,11 @@ const AudioRecorderScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
+  },
+  recordingSection: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   buttonContainer: {
     marginVertical: 10,
@@ -174,6 +342,54 @@ const styles = StyleSheet.create({
     fontSize: 48,
     marginBottom: 30,
     color: '#333',
+  },
+  recordingsList: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  recordingItem: {
+    flexDirection: 'row',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recordingInfo: {
+    flex: 1,
+  },
+  recordingName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  recordingDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  recordingControls: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  controlButton: {
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: '#e0e0e0',
+  },
+  deleteButton: {
+    backgroundColor: '#ff4444',
+  },
+  deleteButtonText: {
+    color: 'white',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 20,
   },
 });
 
