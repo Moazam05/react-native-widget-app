@@ -29,9 +29,24 @@ const AudioRecorderScreen = () => {
 
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
 
-  // Load saved recordings on mount
+  // Create recordings directory and load recordings on mount
   useEffect(() => {
-    loadRecordings();
+    const initializeApp = async () => {
+      try {
+        // First ensure the recordings directory exists
+        const exists = await RNFS.exists(RECORDINGS_DIRECTORY);
+        if (!exists) {
+          await RNFS.mkdir(RECORDINGS_DIRECTORY);
+          console.log('Created recordings directory at:', RECORDINGS_DIRECTORY);
+        }
+        await loadRecordings();
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        Alert.alert('Error', 'Failed to initialize app storage');
+      }
+    };
+
+    initializeApp();
   }, []);
 
   const loadRecordings = async () => {
@@ -66,14 +81,29 @@ const AudioRecorderScreen = () => {
 
   const saveRecording = async filePath => {
     try {
+      // Verify source file exists
+      const sourceExists = await RNFS.exists(filePath);
+      if (!sourceExists) {
+        throw new Error('Source recording file not found');
+      }
+
+      // Ensure directory exists
+      const dirExists = await RNFS.exists(RECORDINGS_DIRECTORY);
+      if (!dirExists) {
+        await RNFS.mkdir(RECORDINGS_DIRECTORY);
+      }
+
       const timestamp = new Date().getTime();
       const fileName = `recording_${timestamp}${
         Platform.OS === 'ios' ? '.m4a' : '.mp3'
       }`;
       const newPath = `${RECORDINGS_DIRECTORY}/${fileName}`;
 
-      // Move the recording to our permanent directory
-      await RNFS.moveFile(filePath, newPath);
+      // Copy instead of move, then delete original if copy successful
+      await RNFS.copyFile(filePath, newPath);
+      await RNFS.unlink(filePath);
+
+      console.log('Recording saved to:', newPath);
 
       const newRecording = {
         id: timestamp.toString(),
@@ -161,9 +191,7 @@ const AudioRecorderScreen = () => {
   const startRecording = async () => {
     try {
       const hasPermission = await checkAndRequestPermissions();
-      if (!hasPermission) {
-        return;
-      }
+      if (!hasPermission) return;
 
       const timestamp = new Date().getTime();
       const tempPath = Platform.select({
@@ -199,21 +227,25 @@ const AudioRecorderScreen = () => {
   };
 
   const stopRecording = async () => {
-    if (!isRecording) {
-      return;
-    }
+    if (!isRecording) return;
 
     try {
-      const result = await audioRecorderPlayerRef.current.stopRecorder();
+      // Get the file path before stopping the recorder
+      const filePath = await audioRecorderPlayerRef.current.stopRecorder();
+      console.log('Recording stopped at:', filePath);
+
+      // Clean up recorder
       audioRecorderPlayerRef.current.removeRecordBackListener();
       setIsRecording(false);
       setRecordTime('00:00');
-      console.log('Recording stopped:', result);
 
-      // Save the recording to permanent storage
-      await saveRecording(result);
+      // Only try to save if we got a valid file path
+      if (filePath && filePath !== 'Already stopped') {
+        await saveRecording(filePath);
+      }
     } catch (error) {
       console.error('Stop recording error:', error);
+      Alert.alert('Error', 'Failed to stop recording');
     }
   };
 
