@@ -1,26 +1,35 @@
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Dimensions,
+} from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
 
 const PlaybackComponent = ({currentRecording, progress, onStop}) => {
   if (!currentRecording) {
     return null;
   }
 
+  console.log('currentRecording', currentRecording);
+  console.log('progress', progress);
+
+  const progressWidth =
+    (progress.currentTime / progress.duration) * screenWidth;
+
   return (
     <View style={styles.playbackContainer}>
       <Text style={styles.playbackTitle}>{currentRecording.name}</Text>
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {width: `${(progress.currentTime / progress.duration) * 100}%`},
-            ]}
-          />
+          <View style={[styles.progressFill, {width: progressWidth}]} />
         </View>
         <View style={styles.timeContainer}>
           <Text style={styles.timeText}>{progress.playTime}</Text>
-          <Text style={styles.timeText}>{progress.duration}</Text>
+          <Text style={styles.timeText}>{progress.durationTime}</Text>
         </View>
       </View>
       <TouchableOpacity style={styles.stopButton} onPress={onStop}>

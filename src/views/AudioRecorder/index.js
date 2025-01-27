@@ -287,8 +287,9 @@ const AudioRecorderScreen = () => {
         await stopPlayback();
       }
 
+      setCurrentlyPlaying(recording); // Update the currentlyPlaying state
+
       await audioRecorderPlayerRef.current.startPlayer(recording.path);
-      setCurrentlyPlaying(recording);
 
       audioRecorderPlayerRef.current.addPlayBackListener(e => {
         setPlaybackProgress({
