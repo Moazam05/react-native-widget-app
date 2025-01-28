@@ -1,5 +1,7 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
 
 const RecorderComponent = ({
   isRecording,
@@ -8,47 +10,59 @@ const RecorderComponent = ({
   onStopRecording,
 }) => {
   return (
-    <View style={styles.recorderContainer}>
+    <LinearGradient
+      colors={['#FF6B6B', '#EE5253']}
+      style={styles.recorderContainer}>
       <Text style={styles.timerText}>{recordTime}</Text>
       <TouchableOpacity
-        style={[styles.recordButton, isRecording && styles.recordingActive]}
-        onPress={isRecording ? onStopRecording : onStartRecording}>
+        style={styles.recordButtonWrapper}
+        onPress={isRecording ? onStopRecording : onStartRecording}
+        activeOpacity={0.8}>
+        <View
+          style={[styles.recordButton, isRecording && styles.recordingActive]}>
+          <Icon name={isRecording ? 'stop' : 'mic'} size={32} color="#FFF" />
+        </View>
         <Text style={styles.recordButtonText}>
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
+          {isRecording ? 'Stop' : 'Record'}
         </Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 };
+
 const styles = StyleSheet.create({
   recorderContainer: {
-    padding: 20,
+    padding: 18,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    margin: 16,
+    borderRadius: 20,
   },
   timerText: {
     fontSize: 48,
-    marginBottom: 20,
-    color: '#333',
+    marginBottom: 24,
+    color: '#FFF',
     fontWeight: '300',
+    fontFamily: 'monospace',
+  },
+  recordButtonWrapper: {
+    alignItems: 'center',
   },
   recordButton: {
-    backgroundColor: '#ff4444',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    width: '80%',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   recordingActive: {
-    backgroundColor: '#cc0000',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   recordButtonText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
 });
 

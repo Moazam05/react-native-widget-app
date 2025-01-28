@@ -11,8 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import RecorderComponent from './components/RecorderComponent';
-import PlaybackComponent from './components/PlaybackComponent';
 import RecordingListComponent from './components/RecordingListComponent';
+import Header from '../../components/Header';
 
 const RECORDINGS_KEY = '@recordings';
 const RECORDINGS_DIRECTORY = Platform.select({
@@ -332,6 +332,8 @@ const AudioRecorderScreen = () => {
 
   return (
     <View style={styles.container}>
+      <Header title="AUDIO RECORDER" icon="mic" />
+
       <RecorderComponent
         isRecording={isRecording}
         recordTime={recordTime}
@@ -339,16 +341,12 @@ const AudioRecorderScreen = () => {
         onStopRecording={stopRecording}
       />
 
-      <PlaybackComponent
-        currentRecording={currentlyPlaying}
-        progress={playbackProgress}
-        onStop={stopPlayback}
-      />
-
       <RecordingListComponent
         recordings={recordings}
         onPlayRecording={handlePlayRecording}
         onDeleteRecording={deleteRecording}
+        currentlyPlaying={currentlyPlaying}
+        playbackProgress={playbackProgress}
       />
     </View>
   );
@@ -357,7 +355,6 @@ const AudioRecorderScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
   },
 });
 
