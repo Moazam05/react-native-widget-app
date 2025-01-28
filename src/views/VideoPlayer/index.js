@@ -5,10 +5,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
+  Modal,
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Slider from '@react-native-community/slider';
 
 const VideoPlayer = () => {
   const [isBuffering, setIsBuffering] = useState(false);
@@ -21,11 +22,41 @@ const VideoPlayer = () => {
   });
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [showSpeedOptions, setShowSpeedOptions] = useState(false);
   const videoRef = useRef(null);
 
+  const speedOptions = [
+    {label: '1x', value: 1},
+    {label: '1.5x', value: 1.5},
+    {label: '2x', value: 2},
+  ];
+
   const videoUrl =
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
+    'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
+
+  const onBuffer = ({iSBuffering}) => {
+    setIsBuffering(iSBuffering);
+  };
+
+  const onProgress = data => {
+    if (!isSeeking) {
+      setPlaybackInfo({
+        currentTime: data.currentTime,
+        playableDuration: data.playableDuration,
+        seekableDuration: data.seekableDuration,
+      });
+    }
+  };
+
+  const onLoad = data => {
+    setDuration(data.duration);
+    setIsBuffering(false);
+  };
+
+  const onError = error => {
+    console.log('Video error:', error);
+  };
 
   const formatTime = seconds => {
     const hours = Math.floor(seconds / 3600);
@@ -40,58 +71,40 @@ const VideoPlayer = () => {
     return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const onBuffer = ({isBuffering}) => {
-    console.log('Buffer state:', isBuffering ? 'Buffering' : 'Playing');
-    setIsBuffering(isBuffering);
-  };
-
-  const onProgress = data => {
-    setPlaybackInfo({
-      currentTime: data.currentTime,
-      playableDuration: data.playableDuration,
-      seekableDuration: data.seekableDuration,
-    });
-  };
-
-  const onLoad = data => {
-    console.log('Video loaded, duration:', data.duration);
-    setDuration(data.duration);
-    setIsBuffering(false);
-  };
-
-  const onError = error => {
-    console.log('Video error:', error);
-  };
-
-  const changePlaybackSpeed = () => {
-    const speeds = [0.5, 1, 1.5, 2];
-    const currentIndex = speeds.indexOf(playbackRate);
-    const nextIndex = (currentIndex + 1) % speeds.length;
-    setPlaybackRate(speeds[nextIndex]);
-  };
-
   const seek = time => {
-    const newTime = Math.max(0, Math.min(time, duration));
-    videoRef.current.seek(newTime);
-  };
-
-  const seekForward = () => {
-    seek(playbackInfo.currentTime + 10);
-  };
-
-  const seekBackward = () => {
-    seek(playbackInfo.currentTime - 10);
-  };
-
-  const toggleFullscreen = () => {
-    if (videoRef.current) {
-      if (!isFullscreen) {
-        videoRef.current.presentFullscreenPlayer();
-      } else {
-        videoRef.current.dismissFullscreenPlayer();
-      }
-      setIsFullscreen(!isFullscreen);
+    if (!duration || !videoRef.current) {
+      return;
     }
+
+    // Clamp time between 0 and duration
+    const newTime = Math.max(0, Math.min(time, duration));
+
+    try {
+      videoRef.current.seek(newTime);
+    } catch (error) {
+      console.log('Seek error:', error);
+    }
+  };
+
+  const onSeekComplete = () => {
+    setIsBuffering(false);
+    setIsSeeking(false);
+    setIsPlaying(true);
+  };
+
+  const onSlidingStart = () => {
+    setIsSeeking(true);
+    setIsPlaying(false);
+  };
+
+  const onSlidingComplete = value => {
+    setIsSeeking(false);
+    seek(value);
+  };
+
+  const handleSpeedChange = speed => {
+    setPlaybackRate(speed);
+    setShowSpeedOptions(false);
   };
 
   return (
@@ -102,10 +115,10 @@ const VideoPlayer = () => {
           uri: videoUrl,
           type: 'mp4',
           bufferConfig: {
-            minBufferMs: 15000,
+            minBufferMs: 25000,
             maxBufferMs: 50000,
-            bufferForPlaybackMs: 2500,
-            bufferForPlaybackAfterRebufferMs: 5000,
+            bufferForPlaybackMs: 5000,
+            bufferForPlaybackAfterRebufferMs: 10000,
           },
         }}
         style={styles.video}
@@ -118,33 +131,41 @@ const VideoPlayer = () => {
         muted={isMuted}
         resizeMode="contain"
         repeat={false}
+        onSeek={() => setIsBuffering(true)}
+        onSeekComplete={onSeekComplete}
+        progressUpdateInterval={500}
         playInBackground={false}
         playWhenInactive={false}
         ignoreSilentSwitch="ignore"
-        onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
-        onFullscreenPlayerWillDismiss={() => setIsFullscreen(false)}
+        useTextureView
       />
 
       {/* Video Info */}
       <View style={styles.infoOverlay}>
+        <Text style={styles.infoText}>Duration: {formatTime(duration)}</Text>
         <Text style={styles.infoText}>
-          Total Duration: {formatTime(duration)}
-        </Text>
-        <Text style={styles.infoText}>
-          Current: {formatTime(playbackInfo.currentTime)} /{' '}
-          {formatTime(duration)}
+          Current: {formatTime(playbackInfo.currentTime)}
         </Text>
         <Text style={styles.infoText}>
           Buffered:{' '}
           {Math.round(playbackInfo.playableDuration - playbackInfo.currentTime)}
-          s ahead
         </Text>
-        <Text style={styles.infoText}>Speed: {playbackRate}x</Text>
       </View>
 
-      {/* Controls Overlay */}
+      {/* Controls */}
       <View style={styles.controlsContainer}>
-        {/* Top Row */}
+        <Slider
+          style={styles.slider}
+          value={playbackInfo.currentTime}
+          minimumValue={0}
+          maximumValue={duration}
+          minimumTrackTintColor="#FFF"
+          maximumTrackTintColor="#666"
+          thumbTintColor="#FFF"
+          onSlidingStart={onSlidingStart}
+          onSlidingComplete={onSlidingComplete}
+        />
+
         <View style={styles.controlsRow}>
           <TouchableOpacity onPress={() => setIsMuted(!isMuted)}>
             <Icon
@@ -154,40 +175,28 @@ const VideoPlayer = () => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={toggleFullscreen}>
-            <Icon
-              name={isFullscreen ? 'fullscreen-exit' : 'fullscreen'}
-              size={24}
-              color="#fff"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Middle Row - Play/Pause */}
-        <View style={styles.middleRow}>
-          <TouchableOpacity onPress={seekBackward}>
-            <Icon name="replay-10" size={40} color="#fff" />
-          </TouchableOpacity>
-
           <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)}>
             <Icon
               name={isPlaying ? 'pause' : 'play-arrow'}
-              size={50}
+              size={32}
               color="#fff"
             />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={seekForward}>
-            <Icon name="forward-10" size={40} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Row */}
-        <View style={styles.controlsRow}>
           <TouchableOpacity
-            onPress={changePlaybackSpeed}
-            style={styles.speedButton}>
-            <Text style={styles.speedText}>{playbackRate}x</Text>
+            onPress={() => seek(Math.max(0, playbackInfo.currentTime - 10))}>
+            <Icon name="replay-10" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() =>
+              seek(Math.min(duration, playbackInfo.currentTime + 10))
+            }>
+            <Icon name="forward-10" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowSpeedOptions(true)}>
+            <Text style={styles.speedButton}>{playbackRate}x</Text>
           </TouchableOpacity>
 
           <Text style={styles.timeText}>
@@ -195,6 +204,39 @@ const VideoPlayer = () => {
           </Text>
         </View>
       </View>
+
+      {/* Speed Selection Modal */}
+      <Modal
+        visible={showSpeedOptions}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSpeedOptions(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSpeedOptions(false)}>
+          <View style={styles.speedOptionsContainer}>
+            {speedOptions.map(option => (
+              <TouchableOpacity
+                key={option.label}
+                style={[
+                  styles.speedOption,
+                  playbackRate === option.value && styles.selectedSpeedOption,
+                ]}
+                onPress={() => handleSpeedChange(option.value)}>
+                <Text
+                  style={[
+                    styles.speedOptionText,
+                    playbackRate === option.value &&
+                      styles.selectedSpeedOptionText,
+                  ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {isBuffering && (
         <View style={styles.bufferingContainer}>
@@ -213,8 +255,6 @@ const styles = StyleSheet.create({
   },
   video: {
     flex: 1,
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
   },
   bufferingContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -240,36 +280,62 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   controlsContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-  },
-  middleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 40,
-  },
-  speedButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-  },
-  speedText: {
-    color: '#fff',
-    fontSize: 14,
+    marginTop: 10,
   },
   timeText: {
     color: '#fff',
     fontSize: 14,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  speedButton: {
+    color: '#fff',
+    fontSize: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  speedOptionsContainer: {
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 10,
+    minWidth: 120,
+  },
+  speedOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+  },
+  selectedSpeedOption: {
+    backgroundColor: '#666',
+  },
+  speedOptionText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  selectedSpeedOptionText: {
+    fontWeight: 'bold',
   },
 });
 
