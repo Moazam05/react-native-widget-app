@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import Header from '../../components/Header';
-import Controls from './components';
+import Controls from './components/Controls';
 import {formatTime} from '../../utils';
 import BufferInfo from './components/BufferInfo';
 
