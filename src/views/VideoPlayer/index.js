@@ -11,6 +11,8 @@ import {
 import Video from 'react-native-video';
 import Header from '../../components/Header';
 import Controls from './components';
+import {formatTime} from '../../utils';
+import BufferInfo from './components/BufferInfo';
 
 const VideoPlayer = () => {
   const [isBuffering, setIsBuffering] = useState(false);
@@ -57,19 +59,6 @@ const VideoPlayer = () => {
 
   const onError = error => {
     console.log('Video error:', error);
-  };
-
-  const formatTime = seconds => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${
-        secs < 10 ? '0' : ''
-      }${secs}`;
-    }
-    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const seek = time => {
@@ -166,6 +155,8 @@ const VideoPlayer = () => {
           </View>
         )}
       </View>
+
+      <BufferInfo duration={duration} playbackInfo={playbackInfo} />
 
       {/* Speed Selection Modal */}
       <Modal
