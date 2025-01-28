@@ -1,28 +1,86 @@
 import React, {useState, useEffect} from 'react';
-import {View, StyleSheet, Text, ActivityIndicator} from 'react-native';
+import {View, StyleSheet, Text, Animated} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import axios from 'axios';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
+
 import Header from '../../components/Header';
+import Loader from '../../components/Loader';
 
 const MemoryEfficiencyInfo = () => (
-  <View style={styles.infoContainer}>
-    <Text style={styles.infoTitle}>Memory Efficiency</Text>
-    <Text style={styles.infoText}>
-      • Instead of building a 1000-step walkway all at once
-    </Text>
-    <Text style={styles.infoText}>
-      • It only builds the steps that are currently visible (like 10-15 steps)
-    </Text>
-    <Text style={styles.infoText}>
-      • As you move forward, it creates new steps ahead and removes steps behind
-    </Text>
-  </View>
+  <LinearGradient
+    colors={['#50C1E9', '#0891B2']}
+    start={{x: 0, y: 0}}
+    end={{x: 1, y: 0}}
+    style={styles.infoGradient}>
+    <View style={styles.infoContainer}>
+      <View style={styles.infoHeaderContainer}>
+        <Icon name="memory" size={24} color="#FFF" />
+        <Text style={styles.infoTitle}>Memory Efficiency</Text>
+      </View>
+      <View style={styles.infoBullets}>
+        <View style={styles.bulletPoint}>
+          <Icon name="lens" size={8} color="#FFF" style={styles.bullet} />
+          <Text style={styles.infoText}>
+            Instead of building a 1000-step walkway all at once
+          </Text>
+        </View>
+        <View style={styles.bulletPoint}>
+          <Icon name="lens" size={8} color="#FFF" style={styles.bullet} />
+          <Text style={styles.infoText}>
+            It only builds the steps that are currently visible (like 10-15
+            steps)
+          </Text>
+        </View>
+        <View style={styles.bulletPoint}>
+          <Icon name="lens" size={8} color="#FFF" style={styles.bullet} />
+          <Text style={styles.infoText}>
+            As you move forward, it creates new steps ahead and removes steps
+            behind
+          </Text>
+        </View>
+      </View>
+    </View>
+  </LinearGradient>
 );
 
-const ListFooter = ({loading}) =>
-  loading ? (
-    <ActivityIndicator style={styles.loader} size="large" color="#0000ff" />
-  ) : null;
+const ListFooter = ({loading}) => (loading ? <Loader color="#50C1E9" /> : null);
+
+const TaskCard = ({item, index}) => {
+  const statusColor = item.completed ? '#4CAF50' : '#FF5722';
+  const statusIcon = item.completed ? 'check-circle' : 'schedule';
+
+  return (
+    <Animated.View style={styles.itemContainer}>
+      <View style={styles.item}>
+        <View style={styles.itemHeader}>
+          <View style={styles.taskNumberContainer}>
+            <Text style={styles.taskNumber}>#{index + 1}</Text>
+          </View>
+          <View
+            style={[styles.statusBadge, {backgroundColor: `${statusColor}15`}]}>
+            <Icon name={statusIcon} size={16} color={statusColor} />
+            <Text style={[styles.statusText, {color: statusColor}]}>
+              {item.completed ? 'Completed' : 'Pending'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>
+          {item.title}
+        </Text>
+
+        <View style={styles.footer}>
+          <View style={styles.idContainer}>
+            <Icon name="fingerprint" size={14} color="#666" />
+            <Text style={styles.idText}>ID: {item.id}</Text>
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
 
 const RecyclerView = () => {
   const [loading, setLoading] = useState(true);
@@ -36,7 +94,6 @@ const RecyclerView = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetching multiple todos to create a larger list
       const response = await axios.get(
         'https://jsonplaceholder.typicode.com/todos',
       );
@@ -50,27 +107,10 @@ const RecyclerView = () => {
     }
   };
 
-  const renderItem = ({item, index}) => (
-    <View style={styles.item}>
-      <Text style={styles.title}>
-        Task {index + 1}: {item.title}
-      </Text>
-      <View style={styles.statusContainer}>
-        <Text
-          style={[
-            styles.status,
-            {color: item.completed ? '#4CAF50' : '#FF5722'},
-          ]}>
-          Status: {item.completed ? 'Completed' : 'Pending'}
-        </Text>
-      </View>
-      <Text style={styles.info}>ID: {item.id}</Text>
-    </View>
-  );
-
   if (error) {
     return (
       <View style={styles.centerContainer}>
+        <Icon name="error-outline" size={48} color="#FF5722" />
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
@@ -78,25 +118,24 @@ const RecyclerView = () => {
 
   return (
     <View style={styles.container}>
-      <Header title="RecyclerView" icon="list" />
-
-      <Text style={styles.header}>Todo List from API</Text>
+      <Header title="RECYCLER VIEW" icon="view-list" />
 
       <MemoryEfficiencyInfo />
 
       {loading && data.length === 0 ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
+          <Loader color="#50C1E9" />
           <Text style={styles.loadingText}>Loading tasks...</Text>
         </View>
       ) : (
         <FlashList
           data={data}
-          renderItem={renderItem}
-          estimatedItemSize={100}
+          renderItem={({item, index}) => <TaskCard item={item} index={index} />}
+          estimatedItemSize={120}
           onRefresh={fetchData}
           refreshing={loading}
           ListFooterComponent={<ListFooter loading={loading} />}
+          contentContainerStyle={styles.listContainer}
         />
       )}
     </View>
@@ -106,44 +145,68 @@ const RecyclerView = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F6FA',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    padding: 16,
-    backgroundColor: '#f0f0f0',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 16,
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  infoGradient: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 12,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   infoContainer: {
     padding: 16,
-    backgroundColor: '#e8f4ff',
-    marginBottom: 8,
+  },
+  infoHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   infoTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#FFF',
+    marginLeft: 8,
+  },
+  infoBullets: {
+    marginLeft: 4,
+  },
+  bulletPoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
-    color: '#333',
+  },
+  bullet: {
+    marginRight: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#444',
-    marginBottom: 4,
+    color: '#FFF',
+    flex: 1,
     lineHeight: 20,
   },
+  itemContainer: {
+    marginBottom: 12,
+  },
   item: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: 'white',
-    margin: 8,
-    borderRadius: 8,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: {
@@ -153,30 +216,58 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  statusContainer: {
+  taskNumberContainer: {
+    backgroundColor: '#F0F2F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  taskNumber: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  status: {
-    fontSize: 14,
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  title: {
+    fontSize: 16,
     fontWeight: '500',
+    color: '#2D3748',
+    lineHeight: 22,
+    marginBottom: 12,
   },
-  info: {
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F2F5',
+  },
+  idContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  idText: {
     color: '#666',
     fontSize: 12,
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 4,
-  },
-  loader: {
-    padding: 16,
+    marginLeft: 4,
   },
   loadingText: {
     marginTop: 16,
@@ -186,6 +277,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF5722',
     fontSize: 16,
+    marginTop: 8,
   },
 });
 
