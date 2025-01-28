@@ -1,8 +1,9 @@
-import {View, StyleSheet, ActivityIndicator, SafeAreaView} from 'react-native';
 import React, {useState} from 'react';
+import {StyleSheet, SafeAreaView} from 'react-native';
 import {WebView} from 'react-native-webview';
 
 import Header from '../../components/Header';
+import Loader from '../../components/Loader';
 
 const Browser = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -12,11 +13,7 @@ const Browser = () => {
       <Header title="IN-APP BROWSER" icon="public" />
 
       {/* Loading Indicator */}
-      {isLoading && (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#ba5b38" />
-        </View>
-      )}
+      {isLoading && <Loader color="#4A90E2" />}
 
       <WebView
         source={{uri: 'https://salman-muazam.netlify.app/'}}
@@ -38,17 +35,6 @@ const styles = StyleSheet.create({
 
   webview: {
     flex: 1,
-  },
-  loaderContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    zIndex: 1,
   },
 });
 
