@@ -1,31 +1,15 @@
-import {
-  View,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  SafeAreaView,
-} from 'react-native';
+import {View, StyleSheet, ActivityIndicator, SafeAreaView} from 'react-native';
 import React, {useState} from 'react';
 import {WebView} from 'react-native-webview';
-import Icon from 'react-native-vector-icons/Ionicons';
-import {useNavigation} from '@react-navigation/native';
+
+import Header from '../../components/Header';
 
 const Browser = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const navigation = useNavigation();
-
-  const handleBackPress = () => {
-    navigation.goBack();
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.closeButton} onPress={handleBackPress}>
-          <Icon name="close" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
+      <Header title="IN-APP BROWSER" icon="public" />
 
       {/* Loading Indicator */}
       {isLoading && (
@@ -51,19 +35,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  closeButton: {
-    padding: 8,
-  },
+
   webview: {
     flex: 1,
   },

@@ -2,6 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {View, StyleSheet, Text, ActivityIndicator} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import axios from 'axios';
+import Header from '../../components/Header';
 
 const MemoryEfficiencyInfo = () => (
   <View style={styles.infoContainer}>
@@ -77,6 +78,8 @@ const RecyclerView = () => {
 
   return (
     <View style={styles.container}>
+      <Header title="RecyclerView" icon="list" />
+
       <Text style={styles.header}>Todo List from API</Text>
 
       <MemoryEfficiencyInfo />
