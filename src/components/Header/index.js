@@ -19,6 +19,7 @@ const defaultGradients = {
   VideoPlayer: ['#5C6BC0', '#3F51B5'],
   LLM: ['#6C63FF', '#5449CC'],
   Widget: ['#26C6DA', '#00ACC1'],
+  Flashlight: ['#F6AD55', '#DD6B20'],
 };
 
 const Header = ({

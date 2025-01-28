@@ -61,7 +61,7 @@ const Home = ({navigation}) => {
       title: 'FLASHLIGHT',
       icon: 'flash-on',
       colors: ['#F6AD55', '#DD6B20'],
-      url: 'flashlight',
+      url: 'Flashlight',
     },
   ];
 
@@ -73,11 +73,7 @@ const Home = ({navigation}) => {
           title={item.title}
           icon={item.icon}
           colors={item.colors}
-          onPress={() =>
-            item.url === 'flashlight'
-              ? toggleFlash()
-              : navigation.navigate(item.url)
-          }
+          onPress={() => navigation.navigate(item.url)}
           small={true}
         />
       ))}
