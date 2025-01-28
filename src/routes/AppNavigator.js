@@ -17,11 +17,18 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Home"
+        initialRouteName="Splash"
         screenOptions={{
           headerShown: false,
+          animation: 'fade',
         }}>
-        <Stack.Screen name="Splash" component={Splash} />
+        <Stack.Screen
+          name="Splash"
+          component={Splash}
+          options={{
+            animationEnabled: false,
+          }}
+        />
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="Browser" component={Browser} />
         <Stack.Screen name="RecyclerView" component={RecyclerView} />
