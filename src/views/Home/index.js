@@ -10,18 +10,23 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 
-const MenuItem = ({title, icon, onPress, colors}) => (
+const MenuItem = ({title, icon, onPress, colors, small}) => (
   <TouchableOpacity
-    style={styles.cardContainer}
+    style={[styles.cardContainer, small && styles.smallCard]}
     onPress={onPress}
     activeOpacity={0.9}>
     <LinearGradient
       colors={colors}
-      style={styles.card}
+      style={[styles.card, small && styles.smallCardGradient]}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}>
-      <Icon name={icon} size={32} color="#FFF" style={styles.icon} />
-      <Text style={styles.title}>{title}</Text>
+      <Icon
+        name={icon}
+        size={small ? 24 : 32}
+        color="#FFF"
+        style={styles.icon}
+      />
+      <Text style={[styles.title, small && styles.smallTitle]}>{title}</Text>
     </LinearGradient>
   </TouchableOpacity>
 );
@@ -53,18 +58,37 @@ const Home = ({navigation}) => {
       url: 'VideoPlayer',
     },
     {
-      title: 'LLM INTEGRATION',
-      icon: 'psychology',
-      colors: ['#6C63FF', '#5449CC'],
-      url: 'LLM',
-    },
-    {
-      title: 'WIDGETS',
-      icon: 'widgets',
-      colors: ['#26C6DA', '#00ACC1'],
-      url: 'Widget',
+      title: 'FLASHLIGHT',
+      icon: 'flash-on',
+      colors: ['#F6AD55', '#DD6B20'],
+      url: 'flashlight',
     },
   ];
+
+  const renderRow = (items, index) => (
+    <View key={index} style={styles.row}>
+      {items.map((item, idx) => (
+        <MenuItem
+          key={idx}
+          title={item.title}
+          icon={item.icon}
+          colors={item.colors}
+          onPress={() =>
+            item.url === 'flashlight'
+              ? toggleFlash()
+              : navigation.navigate(item.url)
+          }
+          small={true}
+        />
+      ))}
+    </View>
+  );
+
+  // Create pairs of items
+  const pairs = [];
+  for (let i = 0; i < menuItems.length; i += 2) {
+    pairs.push(menuItems.slice(i, i + 2));
+  }
 
   return (
     <View style={styles.container}>
@@ -80,15 +104,7 @@ const Home = ({navigation}) => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
-        {menuItems.map((item, index) => (
-          <MenuItem
-            key={index}
-            title={item.title}
-            icon={item.icon}
-            colors={item.colors}
-            onPress={() => navigation.navigate(item.url)}
-          />
-        ))}
+        {pairs.map((pair, index) => renderRow(pair, index))}
       </ScrollView>
     </View>
   );
@@ -116,10 +132,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   cardContainer: {
-    marginBottom: 16,
+    flex: 1,
     borderRadius: 12,
     elevation: 4,
     shadowColor: '#000',
@@ -137,14 +159,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 80,
   },
+  smallCard: {
+    flex: 0.485,
+  },
+  smallCardGradient: {
+    padding: 16,
+    minHeight: 70,
+  },
   icon: {
-    marginRight: 16,
+    marginRight: 12,
   },
   title: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.5,
+    flex: 1,
+  },
+  smallTitle: {
+    fontSize: 14,
   },
 });
 

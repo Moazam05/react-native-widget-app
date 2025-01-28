@@ -8,8 +8,6 @@ import Browser from '../views/Browser';
 import RecyclerView from '../views/RecyclerView';
 import AudioRecorder from '../views/AudioRecorder';
 import VideoPlayer from '../views/VideoPlayer';
-import LLM from '../views/LLM';
-import Widget from '../views/Widget';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,8 +32,6 @@ const AppNavigator = () => {
         <Stack.Screen name="RecyclerView" component={RecyclerView} />
         <Stack.Screen name="AudioRecorder" component={AudioRecorder} />
         <Stack.Screen name="VideoPlayer" component={VideoPlayer} />
-        <Stack.Screen name="LLM" component={LLM} />
-        <Stack.Screen name="Widget" component={Widget} />
       </Stack.Navigator>
     </NavigationContainer>
   );
