@@ -3,167 +3,205 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import Slider from '@react-native-community/slider'; // Changed import
 
 const VideoPlayer = () => {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [duration, setDuration] = useState(0);
-  const [showControls, setShowControls] = useState(true);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
-  const [showSpeedOptions, setShowSpeedOptions] = useState(false);
-  const [buffered, setBuffered] = useState(0);
+  const [playbackInfo, setPlaybackInfo] = useState({
+    currentTime: 0,
+    playableDuration: 0,
+    seekableDuration: 0,
+  });
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRef = useRef(null);
 
-  // Example of a long video URL (replace with your video URL)
   const videoUrl =
-    'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
+
+  const formatTime = seconds => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${
+        secs < 10 ? '0' : ''
+      }${secs}`;
+    }
+    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const onBuffer = ({isBuffering}) => {
+    console.log('Buffer state:', isBuffering ? 'Buffering' : 'Playing');
     setIsBuffering(isBuffering);
   };
 
-  const onLoadStart = () => {
-    setIsBuffering(true);
+  const onProgress = data => {
+    setPlaybackInfo({
+      currentTime: data.currentTime,
+      playableDuration: data.playableDuration,
+      seekableDuration: data.seekableDuration,
+    });
   };
 
   const onLoad = data => {
+    console.log('Video loaded, duration:', data.duration);
     setDuration(data.duration);
     setIsBuffering(false);
   };
 
-  const onProgress = data => {
-    setCurrentTime(data.currentTime);
-    setBuffered(data.playableDuration);
+  const onError = error => {
+    console.log('Video error:', error);
   };
 
-  const onSeek = time => {
-    videoRef.current.seek(time);
+  const changePlaybackSpeed = () => {
+    const speeds = [0.5, 1, 1.5, 2];
+    const currentIndex = speeds.indexOf(playbackRate);
+    const nextIndex = (currentIndex + 1) % speeds.length;
+    setPlaybackRate(speeds[nextIndex]);
   };
 
-  const formatTime = timeInSeconds => {
-    const hours = Math.floor(timeInSeconds / 3600);
-    const minutes = Math.floor((timeInSeconds % 3600) / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
+  const seek = time => {
+    const newTime = Math.max(0, Math.min(time, duration));
+    videoRef.current.seek(newTime);
+  };
 
-    if (hours > 0) {
-      return `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${
-        seconds < 10 ? '0' : ''
-      }${seconds}`;
+  const seekForward = () => {
+    seek(playbackInfo.currentTime + 10);
+  };
+
+  const seekBackward = () => {
+    seek(playbackInfo.currentTime - 10);
+  };
+
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (!isFullscreen) {
+        videoRef.current.presentFullscreenPlayer();
+      } else {
+        videoRef.current.dismissFullscreenPlayer();
+      }
+      setIsFullscreen(!isFullscreen);
     }
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
-
-  const toggleControls = () => {
-    setShowControls(!showControls);
-    // Auto-hide controls after 3 seconds
-    if (!showControls) {
-      setTimeout(() => setShowControls(false), 3000);
-    }
-  };
-
-  const speedOptions = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.videoWrapper}
-        onPress={toggleControls}>
-        <Video
-          ref={videoRef}
-          source={{
-            uri: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-            type: 'mp4',
-            headers: {Range: 'bytes=0-'},
-            bufferConfig: {
-              minBufferMs: 15000,
-              maxBufferMs: 50000,
-              bufferForPlaybackMs: 2500,
-              bufferForPlaybackAfterRebufferMs: 5000,
-            },
-          }}
-          style={styles.video}
-          onBuffer={onBuffer}
-          onLoadStart={onLoadStart}
-          onLoad={onLoad}
-          onProgress={onProgress}
-          paused={!isPlaying}
-          rate={playbackSpeed}
-          resizeMode="contain"
-          progressUpdateInterval={250}
-        />
+      <Video
+        ref={videoRef}
+        source={{
+          uri: videoUrl,
+          type: 'mp4',
+          bufferConfig: {
+            minBufferMs: 15000,
+            maxBufferMs: 50000,
+            bufferForPlaybackMs: 2500,
+            bufferForPlaybackAfterRebufferMs: 5000,
+          },
+        }}
+        style={styles.video}
+        paused={!isPlaying}
+        onBuffer={onBuffer}
+        onLoad={onLoad}
+        onProgress={onProgress}
+        onError={onError}
+        rate={playbackRate}
+        muted={isMuted}
+        resizeMode="contain"
+        repeat={false}
+        playInBackground={false}
+        playWhenInactive={false}
+        ignoreSilentSwitch="ignore"
+        onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
+        onFullscreenPlayerWillDismiss={() => setIsFullscreen(false)}
+      />
 
-        {isBuffering && (
-          <View style={styles.bufferingContainer}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.bufferingText}>Buffering...</Text>
-          </View>
-        )}
+      {/* Video Info */}
+      <View style={styles.infoOverlay}>
+        <Text style={styles.infoText}>
+          Total Duration: {formatTime(duration)}
+        </Text>
+        <Text style={styles.infoText}>
+          Current: {formatTime(playbackInfo.currentTime)} /{' '}
+          {formatTime(duration)}
+        </Text>
+        <Text style={styles.infoText}>
+          Buffered:{' '}
+          {Math.round(playbackInfo.playableDuration - playbackInfo.currentTime)}
+          s ahead
+        </Text>
+        <Text style={styles.infoText}>Speed: {playbackRate}x</Text>
+      </View>
 
-        {showControls && (
-          <SafeAreaView style={styles.controls}>
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.bufferedProgress,
-                    {width: `${(buffered / duration) * 100}%`},
-                  ]}
-                />
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={duration}
-                  value={currentTime}
-                  onSlidingComplete={onSeek}
-                  minimumTrackTintColor="#FFF"
-                  maximumTrackTintColor="rgba(255,255,255,0.5)"
-                  thumbTintColor="#FFF"
-                />
-              </View>
-              <Text style={styles.timeText}>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </Text>
-            </View>
+      {/* Controls Overlay */}
+      <View style={styles.controlsContainer}>
+        {/* Top Row */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity onPress={() => setIsMuted(!isMuted)}>
+            <Icon
+              name={isMuted ? 'volume-off' : 'volume-up'}
+              size={24}
+              color="#fff"
+            />
+          </TouchableOpacity>
 
-            <View style={styles.controlsRow}>
-              <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)}>
-                <Icon
-                  name={isPlaying ? 'pause' : 'play-arrow'}
-                  size={32}
-                  color="#fff"
-                />
-              </TouchableOpacity>
+          <TouchableOpacity onPress={toggleFullscreen}>
+            <Icon
+              name={isFullscreen ? 'fullscreen-exit' : 'fullscreen'}
+              size={24}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        </View>
 
-              <TouchableOpacity
-                onPress={() => onSeek(Math.max(0, currentTime - 10))}
-                style={styles.seekButton}>
-                <Icon name="replay-10" size={28} color="#fff" />
-              </TouchableOpacity>
+        {/* Middle Row - Play/Pause */}
+        <View style={styles.middleRow}>
+          <TouchableOpacity onPress={seekBackward}>
+            <Icon name="replay-10" size={40} color="#fff" />
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => onSeek(Math.min(duration, currentTime + 10))}
-                style={styles.seekButton}>
-                <Icon name="forward-10" size={28} color="#fff" />
-              </TouchableOpacity>
+          <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)}>
+            <Icon
+              name={isPlaying ? 'pause' : 'play-arrow'}
+              size={50}
+              color="#fff"
+            />
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.speedButton}
-                onPress={() => setShowSpeedOptions(!showSpeedOptions)}>
-                <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        )}
-      </TouchableOpacity>
+          <TouchableOpacity onPress={seekForward}>
+            <Icon name="forward-10" size={40} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Row */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity
+            onPress={changePlaybackSpeed}
+            style={styles.speedButton}>
+            <Text style={styles.speedText}>{playbackRate}x</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.timeText}>
+            {formatTime(playbackInfo.currentTime)} / {formatTime(duration)}
+          </Text>
+        </View>
+      </View>
+
+      {isBuffering && (
+        <View style={styles.bufferingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.bufferingText}>Buffering...</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -173,11 +211,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  videoWrapper: {
-    flex: 1,
-  },
   video: {
     flex: 1,
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
   },
   bufferingContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -189,47 +226,36 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 10,
   },
-  controls: {
+  infoOverlay: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    top: 20,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 10,
+    borderRadius: 5,
   },
-  progressContainer: {
-    marginBottom: 10,
+  infoText: {
+    color: '#fff',
+    fontSize: 12,
+    marginVertical: 2,
   },
-  progressBar: {
-    height: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  bufferedProgress: {
-    position: 'absolute',
-    top: 18,
-    left: 0,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  slider: {
-    flex: 1,
-    height: 40,
+  controlsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between',
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    paddingHorizontal: 10,
   },
-  seekButton: {
-    marginHorizontal: 20,
-  },
-  timeText: {
-    color: '#fff',
-    fontSize: 12,
-    textAlign: 'right',
-    marginTop: 5,
+  middleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 40,
   },
   speedButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -237,7 +263,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 4,
   },
-  speedButtonText: {
+  speedText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  timeText: {
     color: '#fff',
     fontSize: 14,
   },
