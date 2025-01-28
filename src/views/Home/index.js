@@ -32,31 +32,37 @@ const Home = ({navigation}) => {
       title: 'IN-APP BROWSER',
       icon: 'public',
       colors: ['#4A90E2', '#357ABD'],
+      url: 'Browser',
     },
     {
       title: 'RECYCLER VIEW',
       icon: 'view-list',
       colors: ['#50C1E9', '#0891B2'],
+      url: 'RecyclerView',
     },
     {
       title: 'AUDIO RECORDER',
       icon: 'mic',
       colors: ['#FF6B6B', '#EE5253'],
+      url: 'AudioRecorder',
     },
     {
       title: 'VIDEO PLAYER',
       icon: 'play-circle-filled',
       colors: ['#5C6BC0', '#3F51B5'],
+      url: 'VideoPlayer',
     },
     {
       title: 'LLM INTEGRATION',
       icon: 'psychology',
       colors: ['#6C63FF', '#5449CC'],
+      url: 'LLM',
     },
     {
       title: 'WIDGETS',
       icon: 'widgets',
       colors: ['#26C6DA', '#00ACC1'],
+      url: 'Widget',
     },
   ];
 
@@ -80,7 +86,7 @@ const Home = ({navigation}) => {
             title={item.title}
             icon={item.icon}
             colors={item.colors}
-            onPress={() => navigation.navigate(item.title.replace(/\s+/g, ''))}
+            onPress={() => navigation.navigate(item.url)}
           />
         ))}
       </ScrollView>
